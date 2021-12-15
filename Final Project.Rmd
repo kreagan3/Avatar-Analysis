@@ -1,0 +1,381 @@
+---
+title: 'An Analysis of Avatar: The Last Airbender'
+author: "Kenna Reagan"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    df_print: paged
+---
+![](https://github.com/kreagan3/Avatar-Analysis/blob/main/avatar-header.jpeg?raw=true)
+
+Avatar: The Last Airbender is a show that has gripped audiences of all ages for a decade and a half. The storytelling is compelling. The character development in unmatched in cartoon television. The show is full of comedy, action, drama, and mythology. It's no wonder that it is widely agreed up that Avatar has managed to strike the perfect balance between comedy and seriousness. 
+
+These are all bold claims, but can they be backed up? Here, we will analyze the the script of every episode from the entire series. Using sentiment analysis, we will analyze each character and the show as a whole to see what we can learn about character and story development in Avatar: The Last Airbender. 
+
+```{r warning=FALSE, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(sentimentr)
+library(tm)
+library(syuzhet)
+library(SnowballC)
+
+avatar_raw <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-11/avatar.csv")
+
+#View(avatar_raw)
+
+# Convert character_words to corpus
+raw_corpus <- Corpus(VectorSource(avatar_raw$character_words))
+
+# Process text
+raw_corpus <- tm_map(raw_corpus,content_transformer(tolower))
+raw_corpus <-tm_map(raw_corpus,removeWords,stopwords("en"))
+raw_corpus <- tm_map(raw_corpus,removeNumbers)
+raw_corpus <- tm_map(raw_corpus,removePunctuation)
+raw_corpus <- tm_map(raw_corpus,stemDocument)
+avatar_raw <- dplyr::bind_cols(avatar_raw,data.frame(raw_corpus$content))
+#View()
+```
+
+
+```{r include=FALSE}
+# Filtering out everyone but main characters
+avatar_clean <- filter(avatar_raw,
+  character=="Aang" | character=="Katara" | character=="Sokka" | character=="Zuko" | character=="Toph" | character=="Iroh")
+#View(avatar_clean)
+```
+
+# Series Overview
+
+Before diving into things, it's important to have a basic understanding of the premise of the show. Avatar: The Last Airbender is set in a world with four nations: the Fire Nation, the Water Tribes, the Earth Kingdom, and the Air Nomads. In each nation, there are people who are able to "bend" the element of their nation, meaning they are able to manipulate that element telekinetically. However, only one person is able to bend all four elements. This person is called The Avatar. 
+
+The series follows Aang, the current Avatar, and his friends Katara, Sokka, and later Toph, as they work together to end the war with The Fire Nation. Meanwhile, Zuko and his wize Uncle Iroh are on a mission to capture Aang and bring him back to Zuko's father, the leader of The Fire Nation. 
+
+```{r echo=FALSE, warning=FALSE}
+# Number of lines from each main character
+line_count <- avatar_clean %>%
+  count(character, sort = TRUE)
+
+# Graph of number of lines
+ggplot(line_count,aes(x=reorder(character,-n),y=n,fill=character))+geom_bar(stat="identity") + scale_fill_manual("legend", values = c("Aang" = "darkgoldenrod4", "Katara" = "skyblue3", "Sokka" = "dodgerblue4", "Zuko"="red3", "Toph"="darkgreen", "Iroh"="darkred")) + theme(plot.title = element_text(size = 20, face = "bold"), axis.text.x = element_text(angle = 60, hjust = 1),panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Main Cast in Avatar: The Last Airbender") +xlab("Characters") + ylab("Line Count") 
+```
+
+Here is an overview of the lines spoken by each character. This isn't all too surprising as the main characters speak the most, followed by their enemy. While Toph becomes a main character later on, we don't see her in the first season. Iroh serves as a character who offer his wisdom to Zuko, which serves to balance out his anger and teach a lesson. He tends to use a lot of memorable one-liners. 
+
+```{r echo=FALSE, warning=FALSE}
+# Get emotion sentiments
+emotions <- get_nrc_sentiment(raw_corpus$content)
+
+sumdata=data.frame(value=apply(emotions,2,sum))
+sumdata$key=rownames(sumdata)
+ggplot(sumdata, aes(x=reorder(key,-value), y=value, fill=key)) + geom_bar(stat="identity") + scale_fill_manual("legend", values = c("positive" = "skyblue3", "trust" = "tomato2", "negative" = "red3", "anticipation"="darkgoldenrod4", "fear"="darkred", "joy"="dodgerblue4", "anger"="gray24", "sadness"="black", "surprise"="goldenrod2", "disgust"="darkgreen")) + theme(plot.title = element_text(size = 20, face = "bold"), axis.text.x = element_text(angle = 60, hjust = 1),panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Sentiment Scores for the Series") +xlab("Sentiment") + ylab("Score") 
+```
+Here is the first opportunity to get to see how balanced the show is. Emotions can be a good indicator of what the show is going for. For example, in a comedic moment, we may see higher scores for joy and positivity. Maybe in an action scene, we'd see higher scores for negativity, or even fear. 
+
+In terms of balance, we can see a pretty diverse display of emotion. Overwhelmingly, the highest emotional sentiment score is positivity. While at a glance, that may seem a little unbalanced, this is ultimately intended to be a heartwarming children's show. The intent of the show is to teach lessons about nuanced human relationships. I think this is clearly reflected in the emotional sentiment scores with emotions like trust, fear, joy, anger, and sadness being well-represented. It is important to note that negative emotions are well-represented here without overwhelming the positive emotions. This suggests that the show allows viewers to explore complex and often difficult emotions without overwhelming them. 
+
+```{r echo=FALSE, warning=FALSE}
+# Positivity Rating
+
+# Get positivity rating
+atla_sent <- get_sentiment(avatar_clean$raw_corpus.content)
+avatar_clean <- dplyr::bind_cols(avatar_clean,data.frame(atla_sent))
+
+sent_avg <- group_by(avatar_clean, character) %>% summarize(m = mean(atla_sent))
+
+
+ggplot(sent_avg,aes(x=reorder(character,-m),y=m,fill=character))+geom_bar(stat="identity") + scale_fill_manual("legend", values = c("Aang" = "darkgoldenrod4", "Katara" = "skyblue3", "Sokka" = "dodgerblue4", "Zuko"="red3", "Toph"="darkgreen", "Iroh"="darkred")) + theme(plot.title = element_text(size = 20, face = "bold"), axis.text.x = element_text(angle = 60, hjust = 1),panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Character Positivity Rating") +xlab("Characters") + ylab("Average Positivity Rating")
+```
+
+The remainder of this report will focus on positivity scores for each character and use that as the basis for an analysis of character relationships and character development. Above, we see a representation of the overall positivity scores for each of the main characters throughout the entire series. 
+
+Unsurprisingly, Iroh is by far the most positive. As previously mentioned, his role is often to offer advice and counteract Zuko's anger. The vast majority of what he says is meant to encourage. The only other character I really want to note here is Sokka. As a main protagonist, it's funny that he has the lowest positivity score, putting him even lower than the show's antagonist. Fans of the show, however, may not be so surprised. He is routinely referred to (mostly by his sister, Katara) as immature. He is often very skeptical and matter-of-fact, a trait that often clashes with Aang and Katara. As the show progressed, his role was solidified as a protector of the group. Don't let the low positivity score fool you. He is the source of much of the show's humor, even if at his own expense. 
+
+# Character Arc by Positivity Rating
+
+## Season One: Water {.tabset}  
+### Aang
+```{r echo=FALSE, warning=FALSE}
+# Subset the main df by character and then by Book 1
+aang <- subset(avatar_clean, subset = character=="Aang")
+aang1 <- subset(aang, subset = book=="Water")
+katara <- subset(avatar_clean, subset = character=="Katara")
+katara1 <- subset(katara, subset = book=="Water")
+sokka <- subset(avatar_clean, subset = character=="Sokka")
+sokka1 <- subset(sokka, subset = book=="Water")
+toph <- subset(avatar_clean, subset = character=="Toph")
+zuko <- subset(avatar_clean, subset = character=="Zuko")
+zuko1 <- subset(zuko, subset = book=="Water")
+iroh <- subset(avatar_clean, subset = character=="Iroh")
+iroh1 <- subset(iroh, subset = book=="Water")
+
+# Get Aang's positivity rating
+aang_water <- group_by(aang1, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(aang_water,aes(x=chapter_num,y=m,)) + geom_line(color="darkgoldenrod4",size=2) + geom_point(color="darkgoldenrod4",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Aang's Season One Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+### Katara
+
+```{r echo=FALSE, warning=FALSE}
+# Get Katara's positivity rating
+katara_water <- group_by(katara1, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(katara_water,aes(x=chapter_num,y=m,))+geom_line(color="skyblue3",size=2) + geom_point(color="skyblue3",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Katara's Season One Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+### Sokka
+
+```{r echo=FALSE, warning=FALSE}
+# Get Sokka's positivity rating
+sokka_water <- group_by(sokka1, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(sokka_water,aes(x=chapter_num,y=m,))+geom_line(color="dodgerblue4",size=2) + geom_point(color="dodgerblue4",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Sokka's Season One Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+### Zuko
+
+```{r echo=FALSE, warning=FALSE}
+# Get Zuko's positivity rating
+zuko_water <- group_by(zuko1, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(zuko_water,aes(x=chapter_num,y=m,))+geom_line(color="red3",size=2) + geom_point(color="red3",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Zuko's Season One Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+### Iroh
+
+```{r echo=FALSE, warning=FALSE}
+# Get Iroh's positivity rating
+iroh_water <- group_by(iroh1, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(iroh_water,aes(x=chapter_num,y=m,))+geom_line(color="darkred",size=2) + geom_point(color="darkred",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Iroh's Season One Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+## 
+
+Season one is all about Aang, Katara, and Sokka making their way to the Northern Water Tribe to learn water bending. Meanwhile, the Fire Nation is waging war on the Earth Kingdom and the Water Tribes and Zuko is on his mission to find the Avatar and return him to the Fire Nation. Here, mapping the average positivity rating for each character in each episode gives us a chance to explore the characters throughout the season.
+
+There are some pretty extreme spikes from one episode to the next. In the beginning, we are still being introduced to the characters and the world they live in. The first really notable moment in the show is in episode three when Aang, Katara, and Sokka arrive at the Southern Air Temple, only for Aang to realize that all of his people have been killed by the Fire Nation. This can be noted by the sudden drops in positivity by Aang and Katara. Sokka's positivity rating notablly goes up. He drops his "immature", matter-of-fact attitude some to be a comforter for Aang in his grief. 
+
+Another notable moment for the main characters in this season is in episode ten when they are introduced to Jet. Initially, he charms Aang and Katara, but Sokka wasn't so easily fooled. The group end up facing some serious moral questions when they realize Jet and his friends intend to destroy a village of Fire Nation civilians. While Katara's positivity score may not have dropped so much because she had a crush on Jet, Aang and Sokka's drop significantly as all three are confronted with this dilemma and ultimately save the Fire Nation civilians. 
+
+Another interesting pattern to note is how Iroh's positivity score often mirrors Zuko's. Overall, his score remains significantly higher than that of Zuko's, but generally Iroh's score rises when Zuko's rises and Iroh's score drops when Zuko's drops. I think this is reflective of the the caring relationship between the uncle and his nephew. When Zuko is hurting, Iroh is also hurting. Even so, he tries to be an encouragement to Zuko. I think we can also times where there are spikes in Zuko's positivity score, likely out of an excitement to catch the Avatar. In these moments, we see Iroh's score drop, likely because Iroh doesn't want Zuko to get so caught up in catching the Avatar and pleasing his father that he loses any goodness left in him.
+
+It's also notable that everyone's positivity score falls in the last episode of the season. This finale was particularly crushing. The Fire Nation and Zuko had made their way to the Northern Water Tribe with the intent to destroy them and capture Aang. A major battle ensues and culmites in the loss of a major character. The death was an act of sacrifice for the greater good and it would have anyone in tears. 
+
+## Season Two: Earth {.tabset}
+### Aang
+```{r echo=FALSE, warning=FALSE}
+# Subset the main df by character and then by Book 1
+aang2 <- subset(aang, subset = book=="Earth")
+katara2 <- subset(katara, subset = book=="Earth")
+sokka2 <- subset(sokka, subset = book=="Earth")
+toph2 <- subset(toph, subset = book=="Earth")
+zuko2 <- subset(zuko, subset = book=="Earth")
+iroh2 <- subset(iroh, subset = book=="Earth")
+azula2 <- subset(azula, subset = book=="Earth")
+
+
+# Get Aang's positivity rating
+aang_earth <- group_by(aang2, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(aang_earth,aes(x=chapter_num,y=m,))+geom_line(color="darkgoldenrod4",size=2) + geom_point(color="darkgoldenrod4",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Aang's Season Two Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+
+### Katara
+
+```{r echo=FALSE, warning=FALSE}
+# Get Katara's positivity rating
+katara_earth <- group_by(katara2, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(katara_earth,aes(x=chapter_num,y=m,))+geom_line(color="skyblue3",size=2) + geom_point(color="skyblue3",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Katara's Season Two Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+
+### Sokka
+
+```{r echo=FALSE, warning=FALSE}
+# Get Sokka's positivity rating
+sokka_earth <- group_by(sokka2, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(sokka_earth,aes(x=chapter_num,y=m,))+geom_line(color="dodgerblue4",size=2) + geom_point(color="dodgerblue4",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Sokka's Season Two Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+
+### Toph
+
+```{r echo=FALSE, warning=FALSE}
+# Get Toph's positivity rating
+toph_earth <- group_by(toph2, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(toph_earth,aes(x=chapter_num,y=m,))+geom_line(color="darkgreen",size=2) + geom_point(color="darkgreen",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Toph's Season Two Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+
+### Zuko
+
+```{r echo=FALSE, warning=FALSE}
+# Get Zuko's positivity rating
+zuko_earth <- group_by(zuko2, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(zuko_earth,aes(x=chapter_num,y=m,))+geom_line(color="red3",size=2) + geom_point(color="red3",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Zuko's Season Two Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+
+### Iroh
+
+```{r echo=FALSE, warning=FALSE}
+# Get Iroh's positivity rating
+iroh_earth <- group_by(iroh2, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(iroh_earth,aes(x=chapter_num,y=m,))+geom_line(color="darkred",size=2) + geom_point(color="darkred",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Iroh's Season Two Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+##
+
+Season two begins on a low note for everyone, as can be reflected in the low positivity scores across the board (except for the ever-encouraging Iroh). Aang, Katara, and Sokka begin making their way to the Earth Kingdom so Aang can learn earth bending. They find themselve's at an Earth Kingdom base where the leader tries to trigger Aang's avatar state by traumatizing him. Meanwhile, Zuko and Iroh meet up with Zuko's sister, Azula, with whom he has a strained relationship. 
+
+What's interesting in this season is that Aang and Katara's positivity scores mirror each other similarly to how Zuko and Iroh's mirrored each other in season one. While they vary individually, they generally stay within the same range and have the same types of movement. Sokka's varies quite a bit, but it is overall lower than the previous season. 
+
+In this season, we are also introduced to Toph, a blind earth bender. She joins the group as a main cast member for the remainder of the series. Toph and Sokka's positivity scores mirror each other in the same way that Katara and Aang's do. 
+
+I think it's important to note that the famous "Secret Tunnel" is performed in episode two of this season. The overall story of the episode is one of reconciliation and that is reflected in the spike in positivity scores. 
+
+Zuko hits an all-time low in season two. He is faced with his past when he meets his sister and eventually betrays his uncle. He has to deal with a series of deaths and mistreatment he experienced as a child that ultimately led to his banishment from the Fire Nation. This season gives a lot of insight into Zuko's motivations for finding the Avatar and returning him to his father. All of this is reflected in a positivity score that generally remains very low. 
+
+## Season Three: Fire {.tabset}
+### Aang
+```{r echo=FALSE, warning=FALSE}
+# Subset the main df by character and then by Book 1
+aang3 <- subset(aang, subset = book=="Fire")
+katara3 <- subset(katara, subset = book=="Fire")
+sokka3 <- subset(sokka, subset = book=="Fire")
+toph3 <- subset(toph, subset = book=="Fire")
+zuko3 <- subset(zuko, subset = book=="Fire")
+iroh3 <- subset(iroh, subset = book=="Fire")
+azula3 <- subset(azula, subset = book=="Fire")
+
+
+# Get Aang's positivity rating
+aang_fire <- group_by(aang3, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(aang_fire,aes(x=chapter_num,y=m,))+geom_line(color="darkgoldenrod4",size=2) + geom_point(color="darkgoldenrod4",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Aang's Season Three Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+
+### Katara
+
+```{r echo=FALSE, warning=FALSE}
+# Get Katara's positivity rating
+katara_fire <- group_by(katara3, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(katara_fire,aes(x=chapter_num,y=m,))+geom_line(color="skyblue3",size=2) + geom_point(color="skyblue3",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Katara's Season Three Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+
+### Sokka
+
+```{r echo=FALSE, warning=FALSE}
+# Get Sokka's positivity rating
+sokka_fire <- group_by(sokka3, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(sokka_fire,aes(x=chapter_num,y=m,))+geom_line(color="dodgerblue4",size=2) + geom_point(color="dodgerblue4",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Sokka's Season Three Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+
+### Toph
+
+```{r echo=FALSE, warning=FALSE}
+# Get Toph's positivity rating
+toph_fire <- group_by(toph3, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(toph_fire,aes(x=chapter_num,y=m,))+geom_line(color="darkgreen",size=2) + geom_point(color="darkgreen",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Toph's Season Three Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+
+### Zuko
+
+```{r echo=FALSE, warning=FALSE}
+# Get Zuko's positivity rating
+zuko_fire <- group_by(zuko3, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(zuko_fire,aes(x=chapter_num,y=m,))+geom_line(color="red3",size=2) + geom_point(color="red3",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Zuko's Season Three Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+
+### Iroh
+
+```{r echo=FALSE, warning=FALSE}
+# Get Iroh's positivity rating
+iroh_fire <- group_by(iroh3, chapter_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(iroh_fire,aes(x=chapter_num,y=m,))+geom_line(color="darkred",size=2) + geom_point(color="darkred",size=4) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Iroh's Season Three Character Arc") +xlab("Episode") + ylab("Average Positivity Rating") 
+```
+##
+
+As the story works its way to its conclusion in season three, we see some interesting trends in positivity scores. We see characters making decisions that will affect the fate of the world in order to defeat the Fire Nation before Sozin's Comet arrives and the Fire Nation capitalizes on its power. Aang needs to learn the final elemental skill of fire bending as well if he has a chance of beating the fire nation. 
+
+Aang's positivity score remains at a pretty consistent low throughout the season. He is left questioning his own abilities and his role in saving the world. He is only 12, but the fate of the world rests in his ability to save it. 
+
+Katara is all over the place, likely due to her role of encouragement for Aang and the group conflicting with her own insecurities and fears over the coming battle. 
+
+Sokka remains on a relative downward slope while he comes to terms with his jealousy over his inability to bend and what value, if any, he brings to the group. 
+
+Zuko is possibly the most interesting of all. He is welcomed back to the Fire Nation after the supposed death of the Avatar. However, he is conflicted. He has everything he has wanted, but it doesn't seem right to him. Ultimately, Zuko has changed for the better and joins Aang and his friends and teaches Aang fire bending. We don't see Iroh much in the season, but his positivity remains unparalleled, especially after his is reunited with his nephew. 
+
+The show culminates in the two part finale. At the end of the first part, as is reflected in the positivity scores, everyone is beaten down. It seems as if there is no hope for the group to win and that the Fire Nation will ultimately win the war. However, in the end, all the lessons each character has learned come together to defeat the Fire Nation. The positivity scores end on a high note across the board. 
+
+
+## Series Character Arcs {.tabset}
+### Aang
+```{r echo=FALSE, warning=FALSE}
+# Get Aang's positivity rating
+aang_series <- group_by(aang, book_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(aang_series,aes(x=book_num,y=m,))+geom_line(color="darkgoldenrod4",size=2) + geom_point(color="darkgoldenrod4",size=4) + scale_x_discrete(limits=c("1.0", "2.0","3.0"),labels=c("1.0" = "Water", "2.0" = "Earth","3.0" = "Fire")) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Aang's Character Arc") +xlab("Season") + ylab("Average Positivity Rating") 
+```
+
+### Katara
+```{r echo=FALSE, warning=FALSE}
+# Get Katara's positivity rating
+katara_series <- group_by(katara, book_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(katara_series,aes(x=book_num,y=m,))+geom_line(color="skyblue3",size=2) + geom_point(color="skyblue3",size=4) + scale_x_discrete(limits=c("1.0", "2.0","3.0"),labels=c("1.0" = "Water", "2.0" = "Earth","3.0" = "Fire")) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Katara's Character Arc") +xlab("Season") + ylab("Average Positivity Rating") 
+```
+
+### Sokka
+```{r echo=FALSE, warning=FALSE}
+# Get Sokka's positivity rating
+sokka_series <- group_by(sokka, book_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(sokka_series,aes(x=book_num,y=m,))+geom_line(color="dodgerblue4",size=2) + geom_point(color="dodgerblue4",size=4) + scale_x_discrete(limits=c("1.0", "2.0","3.0"),labels=c("1.0" = "Water", "2.0" = "Earth","3.0" = "Fire")) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Sokka's Character Arc") +xlab("Season") + ylab("Average Positivity Rating") 
+```
+
+### Toph
+```{r echo=FALSE, warning=FALSE}
+# Get Toph's positivity rating
+toph_series <- group_by(toph, book_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(toph_series,aes(x=book_num,y=m,))+geom_line(color="darkgreen",size=2) + geom_point(color="darkgreen",size=4) + scale_x_discrete(limits=c("1.0", "2.0","3.0"),labels=c("1.0" = "Water", "2.0" = "Earth","3.0" = "Fire")) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Toph's Character Arc") +xlab("Season") + ylab("Average Positivity Rating") 
+```
+
+### Zuko
+```{r echo=FALSE, warning=FALSE}
+# Get Zuko's positivity rating
+zuko_series <- group_by(zuko, book_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(zuko_series,aes(x=book_num,y=m,))+geom_line(color="red3",size=2) + geom_point(color="red3",size=4) + scale_x_discrete(limits=c("1.0", "2.0","3.0"),labels=c("1.0" = "Water", "2.0" = "Earth","3.0" = "Fire")) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Zuko's Character Arc") +xlab("Season") + ylab("Average Positivity Rating") 
+```
+
+### Iroh
+```{r echo=FALSE, warning=FALSE}
+# Get Iroh's positivity rating
+iroh_series <- group_by(iroh, book_num) %>% summarize(m = mean(atla_sent))
+
+ggplot(iroh_series,aes(x=book_num,y=m,))+geom_line(color="darkred", size=2) + geom_point(color="darkred",size=4) + scale_x_discrete(limits=c("1.0", "2.0","3.0"),labels=c("1.0" = "Water", "2.0" = "Earth","3.0" = "Fire")) + theme(plot.title = element_text(size = 20, face = "bold"), panel.background = element_rect(fill="cornsilk2",color="cornsilk2")) + ggtitle("Iroh's Character Arc") +xlab("Season") + ylab("Average Positivity Rating") 
+```
+##
+
+This is where we will get the best picture of character development in the show. Above, we can see the average positivity score of each character for each season. 
+
+Aang's score generally goes down throughout the series, but I don't think this reflects the worsening of his character. This is more reflective of the difficult lessons he's had to learn. He started out as a young boy who maybe didn't quite fully understand or accept his role as the Avatar. He was innocent and mostly wanted to have fun learning to bend the different elements. However, as the show progresses, he learns a lot about the sacrifices others have made to help him get to where he is, as well as the sacrifices he has to make in order to save the world. In the end, he is willing to make those sacrifices.
+
+Katara starts off the show in a motherly role that she never quite lets go of. Her loyalty is fierce. What we see in these positivity scores is that in season one, she has to learn a lot about herself through learning to bend water. In season three, she's faced with the reality of what she needs to do to help Aang and to help save the world. 
+Sokka tends to be the butt of the joke throughout the series. What we see though is that he begins to find confidence in himself, especially in season three. He may be the only person in the group who can't bend, but that doesn't take away from the value he brings to the group. In fact, many of the things he was made fun of for in the past, work to save them in the end. 
+
+Toph only arrives in season two, but what we see in her positivity scores is mostly character development. She was always a strong character from the moment the group met her. The show just allows us to see more of her as it progresses and allows us to see a more tender side to her as well.
+
+Zuko is the reason people talk about the character development in this show. Overall, his positivity score is low throughout the series. We start off someone who is bitter. He has been banished from the Fire Nation by his own father and he believes that if he is able to capture the Avatar, that he will be welcomed back. I think the only real moments of positivity we see here come from moments of excitement when he thinks he's about to capture the Avatar or when he dreams about what life will be like when he captures the Avatar. Season two is a real low for Zuko. He meets his estranged, and deranged, sister, Azula. He is faced with his past, deaths in his family, mistreatment as a child, and a strained relationship with his sister. He is forced to decide what is important to him and he ultimately betrays his uncle and attempts to defeat the Avatar once and for all to be welcomed back to the Fire Nation. Ultimately, in the end, good wins out and Zuko realized that being at home in the Fire Nation was never what would bring him true satisfaction. He found true friendship with Aang and his friends and worked with them to defeat the Fire Nation, becoming a hero. 
+
+We see an unusually high positivity score in season two for Iroh. I thought this was strange at first, considering his nephew betrays him. However, his role as wisdom giver is extended beyond Zuko in this season to the protagonists of the show. This could be why we see such a spike in season two. 
+
+## References
+
+1. [Dataset](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-08-11/readme.md#avatarcsv). [`appa` R package](https://github.com/averyrobbins1/appa)
+2. [Image](https://www.shindig.nz/movies/tv/how-avatar-the-last-airbender-sets-the-standard-so-high/). https://www.shindig.nz/movies/tv/how-avatar-the-last-airbender-sets-the-standard-so-high/
+
